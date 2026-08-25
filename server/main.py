@@ -129,5 +129,59 @@ def delete_event(date: str, event_id: str):
     save_db(db)
 
 
+# ---------------------------------------------------------- notify
+import asyncio
+import datetime as _dt
+
+NOTIFY_INTERVAL_SEC = 30
+
+
+def _fire_banner(title: str, body: str) -> None:
+    """winotify 배너. 실패해도 서버는 죽지 않는다."""
+    try:
+        from winotify import Notification
+        n = Notification(
+            app_id="일해라 김준태",
+            title=title,
+            msg=body,
+            duration="long",
+        )
+        n.show()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[notify] 배너 실패(무시): {exc}")
+
+
+async def notify_loop() -> None:
+    """오늘 일정 중 시작시각 도달 + 미완 + 미통보 -> 배너 1회."""
+    while True:
+        try:
+            now = _dt.datetime.now()
+            today = now.strftime("%Y-%m-%d")
+            hhmm = now.strftime("%H:%M")
+            db = load_db()
+            day = db["events"].get(today, [])
+            dirty = False
+            for ev in day:
+                if ev.get("done") or ev.get("notified"):
+                    continue
+                if ev["start"] <= hhmm:
+                    _fire_banner(
+                        f"{ev['start']} {ev['title']}",
+                        f"시작 시간이다. 일해라 김준태. ({ev['start']}~{ev['end']})",
+                    )
+                    ev["notified"] = True
+                    dirty = True
+            if dirty:
+                save_db(db)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[notify] 루프 오류(계속): {exc}")
+        await asyncio.sleep(NOTIFY_INTERVAL_SEC)
+
+
+@app.on_event("startup")
+async def _start_notify() -> None:
+    asyncio.create_task(notify_loop())
+
+
 # 정적 파일은 맨 마지막 (api 라우트 우선)
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

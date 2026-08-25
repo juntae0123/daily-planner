@@ -72,7 +72,7 @@ function showDetail(d){ view="detail";
 // ---------------- render root ----------------
 function render(){
   renderGlobalStats();
-  if(view==="main"){ renderTodayCard(); renderWeekStrip(); renderMonth(); }
+  if(view==="main"){ renderTodayCard(); renderBacklog(); renderWeekStrip(); renderMonth(); }
   else { renderDetailBar(); renderCategoryBar(); renderTimeline(); }
 }
 
@@ -103,6 +103,59 @@ function renderTodayCard(){
     el.innerHTML='<span class="t-time">'+ev.start+"~"+ev.end+"</span>"+
       "<span>"+ev.title+"</span>";
     wrap.appendChild(el);
+  });
+}
+
+// ---------------- main: backlog (밀린 일 카운팅) ----------------
+function collectBacklog(){
+  var todayK=dateKey(new Date());
+  var out=[];
+  Object.keys(db.events).forEach(function(k){
+    if(k>=todayK)return;                       // 오늘 이전만
+    db.events[k].forEach(function(ev){
+      if(!ev.done)out.push({date:k,ev:ev});
+    });
+  });
+  out.sort(function(a,b){return a.date<b.date?-1:1;});
+  return out;
+}
+
+function renderBacklog(){
+  var host=document.getElementById("backlogCard");
+  if(!host){
+    host=document.createElement("section");
+    host.id="backlogCard";
+    host.className="today-card";
+    host.style.marginTop="14px";
+    host.style.cursor="default";
+    var tc=document.getElementById("todayCard");
+    tc.parentNode.insertBefore(host,tc.nextSibling);
+  }
+  var items=collectBacklog();
+  if(!items.length){ host.classList.add("hidden"); return; }
+  host.classList.remove("hidden");
+  var html='<div class="section-head"><h2>밀린 일 '+items.length+
+    '건</h2><span class="hint">클릭하면 오늘로 미룬다</span></div>'+
+    '<div class="today-list">';
+  items.slice(0,8).forEach(function(it){
+    html+='<div class="today-item backlog-item" data-cat="'+it.ev.category+
+      '" data-date="'+it.date+'" data-id="'+it.ev.id+'">'+
+      '<span class="t-time">'+it.date.slice(5)+' '+it.ev.start+'</span>'+
+      '<span>'+it.ev.title+'</span>'+
+      (it.ev.postponeCount?'<span class="t-time">'+it.ev.postponeCount+'회 밀림</span>':'')+
+      '</div>';
+  });
+  if(items.length>8)html+='<div class="today-empty">외 '+(items.length-8)+'건...</div>';
+  html+="</div>";
+  host.innerHTML=html;
+
+  host.querySelectorAll(".backlog-item").forEach(function(el){
+    el.onclick=function(x){
+      x.stopPropagation();
+      // 오늘로 미루기: 날짜만 이동, 시간은 유지 (서버가 postponeCount 기록)
+      apiPatch(el.dataset.date,el.dataset.id,{date:dateKey(new Date())})
+        .then(function(){showToast("오늘로 미뤘다. 이번엔 해라.");return reload();});
+    };
   });
 }
 
