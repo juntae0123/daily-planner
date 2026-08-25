@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일해라 김준태</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1 class="logo">일해라 김준태</h1>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <!-- 메인 뷰: 오늘 카드 + 주간 + 월간 -->
+  <main id="mainView">
+    <section class="today-card" id="todayCard">
+      <div class="section-head">
+        <h2>오늘</h2>
+        <span class="hint">클릭하면 타임라인으로</span>
+      </div>
+      <div id="todayList" class="today-list"></div>
+    </section>
+
+    <section class="week-strip">
+      <div class="section-head"><h2>이번 주</h2></div>
+      <div id="weekStrip" class="week-days"></div>
+    </section>
+
+    <section class="month-cal">
+      <div class="section-head">
+        <button class="nav-btn" id="monthPrev">&#8249;</button>
+        <h2 id="monthLabel"></h2>
+        <button class="nav-btn" id="monthNext">&#8250;</button>
+      </div>
+      <div id="monthGrid" class="month-grid"></div>
+    </section>
+  </main>
+
+  <!-- 상세 뷰: 타임라인 (v1 스펙 계승) -->
+  <main id="detailView" class="hidden">
+    <div class="detail-topbar">
+      <button class="nav-btn" id="backBtn">&#8249; 메인</button>
+      <div class="date-nav">
+        <button class="nav-btn" id="prevBtn">&#8249;</button>
+        <div class="date-label" id="dateLabel"></div>
+        <button class="nav-btn" id="nextBtn">&#8250;</button>
+        <button class="today-btn" id="todayBtn">오늘</button>
+      </div>
+      <div class="stats" id="dayStats"></div>
+    </div>
+    <div class="category-bar" id="categoryBar"></div>
+    <div class="timeline-wrap">
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
