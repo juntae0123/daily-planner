@@ -156,5 +156,13 @@ def backlog() -> str:
     return f"밀린 일 {len(out)}건:\n" + "\n".join(out)
 
 
+@mcp.tool()
+def now() -> str:
+    """현재 날짜/시각/요일. '내일', '지금부터' 같은 상대 시간을 계산하기 전에 반드시 먼저 호출할 것."""
+    n = datetime.datetime.now()
+    weekdays = ["월", "화", "수", "목", "금", "토", "일"]
+    return f"지금은 {n.strftime('%Y-%m-%d %H:%M')} ({weekdays[n.weekday()]}요일)"
+
+
 if __name__ == "__main__":
     mcp.run()
