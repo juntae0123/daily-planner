@@ -1,0 +1,11 @@
+# 시크릿/개인 데이터
+.env
+data/
+# 파이썬
+__pycache__/
+*.pyc
+.pytest_cache/
+# 에디터/OS
+.vscode/
+.idea/
+Thumbs.db

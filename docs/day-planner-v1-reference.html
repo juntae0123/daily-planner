@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하루 계획표</title>
+<style>
+  :root{
+    --bg:#f3f4f7;
+    --panel:#ffffff;
+    --border:#e2e4ea;
+    --border-strong:#cfd2da;
+    --text:#20222a;
+    --text-dim:#9296a1;
+    --text-mute:#c3c6cd;
+    --accent:#3452eb;
+    --danger:#e5484d;
+    --today-line:#e5484d;
+
+    --cat-업무:#3452eb;
+    --cat-공부:#0f9d6c;
+    --cat-개인:#e8930c;
+    --cat-운동:#d6336c;
+
+    --slot-h:48px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app{ max-width:720px; margin:0 auto; padding:0 0 80px; }
+
+  /* ---------- header ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:30;
+    background:var(--bg);
+    padding:18px 20px 10px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    flex-wrap:wrap;
+  }
+  .date-nav{ display:flex; align-items:center; gap:6px; }
+  .nav-btn, .today-btn{
+    border:1px solid var(--border-strong);
+    background:var(--panel);
+    color:var(--text);
+    border-radius:8px;
+    height:32px;
+    padding:0 10px;
+    font-size:14px;
+    cursor:pointer;
+    line-height:1;
+  }
+  .nav-btn{ width:32px; padding:0; font-size:16px; }
+  .nav-btn:hover, .today-btn:hover{ background:#eef0f4; }
+  .date-label{
+    font-size:16px; font-weight:700; min-width:150px; text-align:center;
+    letter-spacing:-0.2px;
+  }
+  .stats{
+    font-size:12.5px; color:var(--text-dim);
+    display:flex; gap:10px; white-space:nowrap;
+  }
+  .stats b{ color:var(--text); font-weight:700; }
+  .stats .dot{ color:var(--text-mute); }
+
+  /* ---------- category bar ---------- */
+  .category-bar{
+    display:flex; gap:8px;
+    padding:4px 20px 14px;
+  }
+  .cat-btn{
+    border:1.5px solid var(--border-strong);
+    background:var(--panel);
+    border-radius:8px;
+    padding:6px 12px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    color:var(--text-dim);
+    display:flex; align-items:center; gap:6px;
+  }
+  .cat-btn .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .cat-btn.active{
+    color:#fff;
+    border-color:transparent;
+  }
+  .cat-btn[data-cat="업무"] .dot{ background:var(--cat-업무); }
+  .cat-btn[data-cat="공부"] .dot{ background:var(--cat-공부); }
+  .cat-btn[data-cat="개인"] .dot{ background:var(--cat-개인); }
+  .cat-btn[data-cat="운동"] .dot{ background:var(--cat-운동); }
+  .cat-btn.active[data-cat="업무"]{ background:var(--cat-업무); }
+  .cat-btn.active[data-cat="공부"]{ background:var(--cat-공부); }
+  .cat-btn.active[data-cat="개인"]{ background:var(--cat-개인); }
+  .cat-btn.active[data-cat="운동"]{ background:var(--cat-운동); }
+  .cat-btn.active .dot{ background:rgba(255,255,255,0.85); }
+
+  /* ---------- timeline ---------- */
+  .timeline-wrap{ padding:6px 20px 0; }
+  .timeline{
+    position:relative;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:6px 0;
+    overflow:hidden;
+  }
+  .grid-row{
+    position:absolute; left:0; right:0;
+    border-top:1px solid var(--border);
+  }
+  .grid-row.hour{ border-top:1px solid var(--border-strong); }
+  .grid-label{
+    position:absolute; left:10px;
+    transform:translateY(-50%);
+    font-size:11px; color:var(--text-dim);
+    background:var(--panel);
+    padding-right:4px;
+    pointer-events:none;
+  }
+  .track{
+    position:relative;
+    margin-left:52px;
+    cursor:pointer;
+  }
+  .now-line{
+    position:absolute; left:0; right:0; height:0;
+    border-top:2px solid var(--today-line);
+    z-index:20; pointer-events:none;
+  }
+  .now-line::before{
+    content:""; position:absolute; left:-5px; top:-4px;
+    width:8px; height:8px; border-radius:50%;
+    background:var(--today-line);
+  }
+
+  /* ---------- event block ---------- */
+  .event-block{
+    position:absolute;
+    border-radius:7px;
+    border-left:4px solid transparent;
+    background:#eef0fb;
+    padding:3px 6px;
+    display:flex; align-items:center; gap:6px;
+    overflow:hidden;
+    font-size:12px;
+    z-index:5;
+  }
+  .event-block[data-cat="업무"]{ border-left-color:var(--cat-업무); background:#eaefff; }
+  .event-block[data-cat="공부"]{ border-left-color:var(--cat-공부); background:#e6f7f0; }
+  .event-block[data-cat="개인"]{ border-left-color:var(--cat-개인); background:#fdf1e0; }
+  .event-block[data-cat="운동"]{ border-left-color:var(--cat-운동); background:#fbe7ee; }
+
+  .event-block.done{ opacity:.5; }
+  .event-block.done .ev-title{ text-decoration:line-through; }
+
+  .ev-title{
+    flex:1; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-weight:600;
+  }
+  .ev-time{
+    flex-shrink:0; display:flex; align-items:center; gap:2px;
+    color:var(--text-dim);
+  }
+  .ev-time input[type="time"]{
+    font-size:10.5px; font-family:inherit;
+    border:none; background:transparent; color:var(--text-dim);
+    width:52px; padding:0; cursor:pointer;
+  }
+  .ev-time input[type="time"]:hover{ color:var(--text); }
+  .ev-time span{ font-size:10px; }
+
+  .del-btn{
+    flex-shrink:0;
+    border:none; background:transparent;
+    color:var(--text-dim);
+    font-size:13px; line-height:1;
+    width:16px; height:16px;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .del-btn:hover{ background:rgba(0,0,0,0.08); color:var(--danger); }
+
+  /* ---------- inline create form ---------- */
+  .create-form{
+    position:absolute;
+    border-radius:7px;
+    border:1.5px dashed var(--border-strong);
+    background:#fff;
+    padding:3px 6px;
+    display:flex; align-items:center; gap:6px;
+    z-index:10;
+    box-shadow:0 2px 10px rgba(20,20,30,0.08);
+  }
+  .create-form input[type="text"]{
+    flex:1; min-width:0; border:none; outline:none;
+    font-size:12.5px; font-family:inherit; font-weight:600;
+    background:transparent;
+  }
+  .create-form input[type="time"]{
+    font-size:10.5px; font-family:inherit;
+    border:none; background:transparent; color:var(--text-dim);
+    width:52px; padding:0;
+  }
+  .create-form span{ font-size:10px; color:var(--text-dim); }
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px);
+    background:#20222a; color:#fff;
+    padding:9px 16px; border-radius:8px;
+    font-size:13px;
+    opacity:0; pointer-events:none;
+    transition:opacity .15s ease, transform .15s ease;
+    z-index:100;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .flash{ animation:flash-anim .5s ease; }
+  @keyframes flash-anim{
+    0%,100%{ box-shadow:none; }
+    30%{ box-shadow:0 0 0 2px var(--danger); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="date-nav">
+      <button class="nav-btn" id="prevBtn">‹</button>
+      <div class="date-label" id="dateLabel"></div>
+      <button class="nav-btn" id="nextBtn">›</button>
+      <button class="today-btn" id="todayBtn">오늘</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="category-bar" id="categoryBar"></div>
+
+  <div class="timeline-wrap">
+    <div class="timeline" id="timeline">
+      <div class="track" id="track"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- config ----------------
+  var START_HOUR = 6;
+  var END_HOUR = 24;
+  var SLOT_MIN = 30;
+  var SLOT_H = 48;                 // px per 30min slot
+  var PX_PER_MIN = SLOT_H / SLOT_MIN;
+  var TOTAL_MIN = (END_HOUR - START_HOUR) * 60;
+  var TOTAL_H = TOTAL_MIN * PX_PER_MIN;
+  var CATS = ["업무", "공부", "개인", "운동"];
+  var STORE_KEY = "dayplanner_v1";
+
+  // ---------------- state ----------------
+  var currentDate = new Date();
+  var selectedCategory = "업무";
+  var events = loadEvents();
+  var draftForm = null; // {el, startMin}
+
+  // ---------------- storage ----------------
+  function loadEvents(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
+  function saveEvents(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(events)); }
+    catch(e){ showToast("저장 실패: 브라우저 저장공간을 확인해주세요"); }
+  }
+
+  // ---------------- helpers ----------------
+  function pad2(n){ return (n<10?"0":"")+n; }
+  function dateKey(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function isSameDay(a,b){ return dateKey(a)===dateKey(b); }
+  function toMin(t){ var p=t.split(":"); return (+p[0])*60 + (+p[1]); }
+  function toTimeStr(min){
+    min = Math.max(0, Math.min(1439, Math.round(min)));
+    return pad2(Math.floor(min/60)) + ":" + pad2(min%60);
+  }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function fmtDuration(min){
+    min = Math.round(min);
+    var h = Math.floor(min/60), m = min%60;
+    if (h===0) return m+"분";
+    if (m===0) return h+"시간";
+    return h+"시간 "+m+"분";
+  }
+  var WEEKDAYS = ["일","월","화","수","목","금","토"];
+  function fmtDateLabel(d){
+    return (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+WEEKDAYS[d.getDay()]+")";
+  }
+
+  var toastTimer=null;
+  function showToast(msg){
+    var t=document.getElementById("toast");
+    t.textContent=msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){ t.classList.remove("show"); }, 1800);
+  }
+
+  function dayEvents(){
+    var k = dateKey(currentDate);
+    if (!events[k]) events[k] = [];
+    return events[k];
+  }
+
+  // ---------------- overlap layout ----------------
+  function layoutDay(list){
+    var sorted = list.slice().sort(function(a,b){
+      var sa=toMin(a.start), sb=toMin(b.start);
+      return sa-sb || (toMin(a.end)-toMin(b.end));
+    });
+    var clusters=[], current=[], curEnd=-1;
+    sorted.forEach(function(ev){
+      var s=toMin(ev.start), e=toMin(ev.end);
+      if (current.length===0 || s < curEnd){
+        current.push(ev);
+        curEnd = Math.max(curEnd, e);
+      } else {
+        clusters.push(current);
+        current=[ev]; curEnd=e;
+      }
+    });
+    if (current.length) clusters.push(current);
+
+    var result=[];
+    clusters.forEach(function(cluster){
+      var colEnds=[], assign={};
+      cluster.forEach(function(ev){
+        var s=toMin(ev.start), e=toMin(ev.end);
+        var placed=false;
+        for (var c=0;c<colEnds.length;c++){
+          if (colEnds[c] <= s){ assign[ev.id]=c; colEnds[c]=e; placed=true; break; }
+        }
+        if (!placed){ assign[ev.id]=colEnds.length; colEnds.push(e); }
+      });
+      var cols = colEnds.length;
+      cluster.forEach(function(ev){ result.push({ ev:ev, col:assign[ev.id], cols:cols }); });
+    });
+    return result;
+  }
+
+  // ---------------- rendering ----------------
+  function render(){
+    document.getElementById("dateLabel").textContent = fmtDateLabel(currentDate);
+    renderCategoryBar();
+    renderStats();
+    renderTimeline();
+  }
+
+  function renderCategoryBar(){
+    var bar = document.getElementById("categoryBar");
+    bar.innerHTML = "";
+    CATS.forEach(function(cat){
+      var btn = document.createElement("button");
+      btn.className = "cat-btn" + (cat===selectedCategory ? " active" : "");
+      btn.dataset.cat = cat;
+      btn.innerHTML = '<span class="dot"></span>' + cat;
+      btn.onclick = function(){ selectedCategory = cat; renderCategoryBar(); };
+      bar.appendChild(btn);
+    });
+  }
+
+  function renderStats(){
+    var list = dayEvents();
+    var total=0, done=0;
+    list.forEach(function(ev){
+      var d = Math.max(0, toMin(ev.end)-toMin(ev.start));
+      total += d;
+      if (ev.done) done += d;
+    });
+    document.getElementById("stats").innerHTML =
+      "계획 <b>"+fmtDuration(total)+"</b>" +
+      '<span class="dot">·</span>' +
+      "완료 <b>"+fmtDuration(done)+"</b>";
+  }
+
+  function renderTimeline(){
+    var timeline = document.getElementById("timeline");
+    // clear all but keep .track reference recreated fresh
+    timeline.innerHTML = "";
+    timeline.style.height = (TOTAL_H + 12) + "px";
+
+    // grid lines + labels
+    for (var i=0; i<=TOTAL_MIN; i+=SLOT_MIN){
+      var isHour = (i % 60 === 0);
+      var top = 6 + i*PX_PER_MIN;
+      var row = document.createElement("div");
+      row.className = "grid-row" + (isHour ? " hour" : "");
+      row.style.top = top + "px";
+      row.style.left = "52px";
+      row.style.right = "0";
+      timeline.appendChild(row);
+      if (isHour){
+        var label = document.createElement("div");
+        label.className = "grid-label";
+        label.style.top = top + "px";
+        label.textContent = pad2(START_HOUR + i/60) + ":00";
+        timeline.appendChild(label);
+      }
+    }
+
+    // track
+    var track = document.createElement("div");
+    track.id = "track";
+    track.style.height = TOTAL_H + "px";
+    track.style.marginTop = "6px";
+    track.addEventListener("click", onTrackClick);
+    timeline.appendChild(track);
+
+    // now line
+    if (isSameDay(currentDate, new Date())){
+      var now = new Date();
+      var nowMin = now.getHours()*60 + now.getMinutes() - START_HOUR*60;
+      if (nowMin >= 0 && nowMin <= TOTAL_MIN){
+        var nl = document.createElement("div");
+        nl.className = "now-line";
+        nl.style.top = (nowMin*PX_PER_MIN) + "px";
+        track.appendChild(nl);
+      }
+    }
+
+    // events
+    var laid = layoutDay(dayEvents());
+    laid.forEach(function(item){
+      track.appendChild(renderEventBlock(item.ev, item.col, item.cols));
+    });
+  }
+
+  function renderEventBlock(ev, col, cols){
+    var s = toMin(ev.start), e = toMin(ev.end);
+    var top = (s - START_HOUR*60) * PX_PER_MIN;
+    var height = Math.max(18, (e - s) * PX_PER_MIN);
+    var widthPct = 100/cols;
+    var leftPct = col * widthPct;
+
+    var block = document.createElement("div");
+    block.className = "event-block" + (ev.done ? " done" : "");
+    block.dataset.cat = ev.category;
+    block.dataset.id = ev.id;
+    block.style.top = top + "px";
+    block.style.height = height + "px";
+    block.style.left = "calc(" + leftPct + "% + 2px)";
+    block.style.width = "calc(" + widthPct + "% - 4px)";
+
+    var title = document.createElement("div");
+    title.className = "ev-title";
+    title.textContent = ev.title;
+    block.appendChild(title);
+
+    var timeWrap = document.createElement("div");
+    timeWrap.className = "ev-time";
+
+    var startInput = document.createElement("input");
+    startInput.type = "time";
+    startInput.value = ev.start;
+    startInput.onclick = function(ev2){ ev2.stopPropagation(); };
+    startInput.onchange = function(){
+      var newS = toMin(startInput.value), curE = toMin(ev.end);
+      if (newS >= curE){
+        showToast("종료 시각이 시작 시각보다 빨라요");
+        block.classList.add("flash");
+        setTimeout(function(){ block.classList.remove("flash"); }, 500);
+        renderTimeline();
+        return;
+      }
+      ev.start = startInput.value;
+      saveEvents();
+      render();
+    };
+
+    var sep = document.createElement("span");
+    sep.textContent = "~";
+
+    var endInput = document.createElement("input");
+    endInput.type = "time";
+    endInput.value = ev.end;
+    endInput.onclick = function(ev2){ ev2.stopPropagation(); };
+    endInput.onchange = function(){
+      var curS = toMin(ev.start), newE = toMin(endInput.value);
+      if (newE <= curS){
+        showToast("종료 시각이 시작 시각보다 빨라요");
+        block.classList.add("flash");
+        setTimeout(function(){ block.classList.remove("flash"); }, 500);
+        renderTimeline();
+        return;
+      }
+      ev.end = endInput.value;
+      saveEvents();
+      render();
+    };
+
+    timeWrap.appendChild(startInput);
+    timeWrap.appendChild(sep);
+    timeWrap.appendChild(endInput);
+    block.appendChild(timeWrap);
+
+    var del = document.createElement("button");
+    del.className = "del-btn";
+    del.textContent = "×";
+    del.title = "삭제";
+    del.onclick = function(ev2){
+      ev2.stopPropagation();
+      deleteEvent(ev.id);
+    };
+    block.appendChild(del);
+
+    block.addEventListener("click", function(e){
+      if (e.target.tagName === "INPUT" || e.target.closest(".del-btn")) return;
+      ev.done = !ev.done;
+      saveEvents();
+      render();
+    });
+    block.addEventListener("contextmenu", function(e){
+      e.preventDefault();
+      deleteEvent(ev.id);
+    });
+
+    return block;
+  }
+
+  function deleteEvent(id){
+    var k = dateKey(currentDate);
+    events[k] = (events[k]||[]).filter(function(x){ return x.id !== id; });
+    saveEvents();
+    render();
+  }
+
+  // ---------------- inline create ----------------
+  function onTrackClick(e){
+    if (draftForm) return; // one draft at a time
+    var track = e.currentTarget;
+    var rect = track.getBoundingClientRect();
+    var y = e.clientY - rect.top;
+    var clickedMin = START_HOUR*60 + y/PX_PER_MIN;
+    var snapped = Math.round(clickedMin / SLOT_MIN) * SLOT_MIN;
+    snapped = Math.max(START_HOUR*60, Math.min(END_HOUR*60 - SLOT_MIN, snapped));
+    openCreateForm(track, snapped);
+  }
+
+  function openCreateForm(track, startMin){
+    var endMin = Math.min(END_HOUR*60 - 1, startMin + SLOT_MIN);
+
+    var form = document.createElement("div");
+    form.className = "create-form";
+    form.style.top = ((startMin - START_HOUR*60) * PX_PER_MIN) + "px";
+    form.style.height = Math.max(24, SLOT_MIN*PX_PER_MIN) + "px";
+    form.style.left = "2px";
+    form.style.width = "calc(100% - 4px)";
+    form.style.borderColor = "var(--cat-" + selectedCategory + ")";
+
+    var titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.placeholder = "제목 입력 후 Enter";
+
+    var startInput = document.createElement("input");
+    startInput.type = "time";
+    startInput.value = toTimeStr(startMin);
+
+    var sep = document.createElement("span");
+    sep.textContent = "~";
+
+    var endInput = document.createElement("input");
+    endInput.type = "time";
+    endInput.value = toTimeStr(endMin);
+
+    form.appendChild(titleInput);
+    form.appendChild(startInput);
+    form.appendChild(sep);
+    form.appendChild(endInput);
+    track.appendChild(form);
+    draftForm = form;
+
+    titleInput.focus();
+
+    function confirm(){
+      var title = titleInput.value.trim();
+      if (!title){ cancel(); return; }
+      var s = toMin(startInput.value), e = toMin(endInput.value);
+      if (e <= s){
+        showToast("종료 시각이 시작 시각보다 빨라요");
+        form.classList.add("flash");
+        setTimeout(function(){ form.classList.remove("flash"); }, 500);
+        return; // keep form open for correction
+      }
+      var list = dayEvents();
+      list.push({
+        id: uid(),
+        title: title,
+        start: startInput.value,
+        end: endInput.value,
+        category: selectedCategory,
+        done: false
+      });
+      saveEvents();
+      draftForm = null;
+      render();
+    }
+    function cancel(){
+      draftForm = null;
+      if (form.parentNode) form.parentNode.removeChild(form);
+    }
+
+    [titleInput, startInput, endInput].forEach(function(inp){
+      inp.addEventListener("click", function(e){ e.stopPropagation(); });
+      inp.addEventListener("keydown", function(e){
+        if (e.key === "Enter"){ e.preventDefault(); confirm(); }
+        else if (e.key === "Escape"){ e.preventDefault(); cancel(); }
+      });
+    });
+
+    form.addEventListener("focusout", function(e){
+      // ignore focus moving between inputs inside the same form
+      if (form.contains(e.relatedTarget)) return;
+      setTimeout(function(){
+        if (!draftForm) return;
+        if (titleInput.value.trim()) confirm(); else cancel();
+      }, 0);
+    });
+  }
+
+  // ---------------- nav ----------------
+  document.getElementById("prevBtn").onclick = function(){
+    currentDate.setDate(currentDate.getDate()-1);
+    render();
+  };
+  document.getElementById("nextBtn").onclick = function(){
+    currentDate.setDate(currentDate.getDate()+1);
+    render();
+  };
+  document.getElementById("todayBtn").onclick = function(){
+    currentDate = new Date();
+    render();
+  };
+
+  // keep now-line + stats live
+  setInterval(function(){
+    if (!draftForm) renderTimeline();
+  }, 60000);
+
+  render();
+})();
+</script>
+</body>
+</html>

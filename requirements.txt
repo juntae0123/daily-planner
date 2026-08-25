@@ -1,0 +1,11 @@
+# ── 코어 ──
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+# ── 데스크톱 창 (Phase 2) ──
+pywebview==5.*
+# ── 윈도우 네이티브 알림 ──
+winotify==1.1.*
+# ── MCP 서버 (Phase 3) ──
+mcp==1.*
+# ── 파일 변경 감지 (앱-MCP 동기화) ──
+watchdog==6.*
