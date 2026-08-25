@@ -164,5 +164,111 @@ def now() -> str:
     return f"지금은 {n.strftime('%Y-%m-%d %H:%M')} ({weekdays[n.weekday()]}요일)"
 
 
+# ---------------------------------------------------------- routines
+import uuid as _uuid
+
+_DAYMAP = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5, "일": 6}
+
+
+def _materialize_routines(db):
+    routines = db.get("routines", [])
+    if not routines:
+        return False
+    changed = False
+    today = datetime.date.today()
+    for off in range(-7, 31):
+        d = today + datetime.timedelta(days=off)
+        ds = d.isoformat()
+        existing = {e.get("routineId") for e in db["events"].get(ds, [])}
+        for r in routines:
+            if ds < r.get("created", "9999-12-31"):
+                continue
+            if d.weekday() in r.get("days", []) and r["id"] not in existing:
+                db["events"].setdefault(ds, []).append({
+                    "id": _uuid.uuid4().hex[:12],
+                    "title": r["title"], "start": r["start"], "end": r["end"],
+                    "category": r.get("category", "개인"),
+                    "done": False, "notified": False,
+                    "postponedFrom": None, "postponeCount": 0,
+                    "routineId": r["id"],
+                })
+                changed = True
+    return changed
+
+
+_orig_load_db = load_db
+
+
+def load_db():
+    db = _orig_load_db()
+    if _materialize_routines(db):
+        save_db(db)
+    return db
+
+
+@mcp.tool()
+def add_routine(title: str, start: str, end: str, days: str,
+                category: str = "개인") -> str:
+    """고정 루틴 등록. 매주 같은 요일/시간에 일정이 자동 생성된다.
+    days: "평일" / "주말" / "매일" 또는 쉼표 요일 "월,수,금". 시각은 HH:MM."""
+    if category not in CATS:
+        return f"category 는 {CATS} 중 하나여야 한다."
+    if end <= start:
+        return "종료가 시작보다 빨라요."
+    days = days.strip()
+    if days == "매일":
+        nums = [0, 1, 2, 3, 4, 5, 6]
+    elif days == "평일":
+        nums = [0, 1, 2, 3, 4]
+    elif days == "주말":
+        nums = [5, 6]
+    else:
+        try:
+            nums = sorted({_DAYMAP[x.strip()] for x in days.split(",")})
+        except KeyError:
+            return "요일은 월~일 한 글자 쉼표 구분. 예: 월,수,금"
+    db = load_db()
+    r = {"id": _uuid.uuid4().hex[:12], "title": title, "start": start,
+         "end": end, "category": category, "days": nums,
+         "created": datetime.date.today().isoformat()}
+    db.setdefault("routines", []).append(r)
+    _materialize_routines(db)
+    save_db(db)
+    names = "".join(k for k, v in sorted(_DAYMAP.items(), key=lambda kv: kv[1]) if v in nums)
+    return f"루틴 등록: [{category}] {title} {start}~{end} ({names}). 앞으로 자동 생성된다. id={r['id']}"
+
+
+@mcp.tool()
+def list_routines() -> str:
+    """등록된 고정 루틴 목록."""
+    rs = load_db().get("routines", [])
+    if not rs:
+        return "루틴 없음."
+    lines = [f"루틴 {len(rs)}건:"]
+    for r in rs:
+        names = "".join(k for k, v in sorted(_DAYMAP.items(), key=lambda kv: kv[1]) if v in r["days"])
+        lines.append(f"- [{r['category']}] {r['title']} {r['start']}~{r['end']} ({names}) id={r['id']}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def delete_routine(routine_id: str) -> str:
+    """루틴 삭제. 오늘 이후 미완 인스턴스도 제거, 과거 기록은 보존."""
+    db = load_db()
+    before = len(db.get("routines", []))
+    db["routines"] = [r for r in db.get("routines", []) if r["id"] != routine_id]
+    if len(db["routines"]) == before:
+        return f"id={routine_id} 루틴 못 찾음. list_routines 로 확인."
+    today = _today()
+    for ds in list(db["events"].keys()):
+        if ds >= today:
+            db["events"][ds] = [e for e in db["events"][ds]
+                                if not (e.get("routineId") == routine_id and not e["done"])]
+            if not db["events"][ds]:
+                del db["events"][ds]
+    save_db(db)
+    return "루틴 삭제됨. 과거 기록은 보존."
+
+
 if __name__ == "__main__":
     mcp.run()
